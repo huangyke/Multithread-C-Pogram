@@ -36,6 +36,7 @@ OBJECTDIR=${CND_BUILDDIR}/${CND_CONF}/${CND_PLATFORM}
 OBJECTFILES= \
 	${OBJECTDIR}/pmessages.o \
 	${OBJECTDIR}/list.o \
+	${OBJECTDIR}/main.o \
 	${OBJECTDIR}/test_messages.o
 
 
@@ -57,10 +58,10 @@ LDLIBSOPTIONS=
 
 # Build Targets
 .build-conf: ${BUILD_SUBPROJECTS}
-	"${MAKE}"  -f nbproject/Makefile-${CND_CONF}.mk test_messages
+	"${MAKE}"  -f nbproject/Makefile-${CND_CONF}.mk main
 
-test_messages: ${OBJECTFILES}
-	${LINK.c} -o test_messages ${OBJECTFILES} ${LDLIBSOPTIONS} 
+main: ${OBJECTFILES}
+	${LINK.c} -o main ${OBJECTFILES} ${LDLIBSOPTIONS} 
 
 ${OBJECTDIR}/pmessages.o: pmessages.c 
 	${MKDIR} -p ${OBJECTDIR}
@@ -71,6 +72,11 @@ ${OBJECTDIR}/list.o: list.c
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} $@.d
 	$(COMPILE.c) -g -MMD -MP -MF $@.d -o ${OBJECTDIR}/list.o list.c
+
+${OBJECTDIR}/main.o: main.c 
+	${MKDIR} -p ${OBJECTDIR}
+	${RM} $@.d
+	$(COMPILE.c) -g -MMD -MP -MF $@.d -o ${OBJECTDIR}/main.o main.c
 
 ${OBJECTDIR}/test_messages.o: test_messages.c 
 	${MKDIR} -p ${OBJECTDIR}
@@ -83,7 +89,7 @@ ${OBJECTDIR}/test_messages.o: test_messages.c
 # Clean Targets
 .clean-conf: ${CLEAN_SUBPROJECTS}
 	${RM} -r ${CND_BUILDDIR}/${CND_CONF}
-	${RM} test_messages
+	${RM} main
 
 # Subprojects
 .clean-subprojects:

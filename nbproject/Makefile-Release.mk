@@ -36,6 +36,7 @@ OBJECTDIR=${CND_BUILDDIR}/${CND_CONF}/${CND_PLATFORM}
 OBJECTFILES= \
 	${OBJECTDIR}/pmessages.o \
 	${OBJECTDIR}/list.o \
+	${OBJECTDIR}/main.o \
 	${OBJECTDIR}/test_messages.o
 
 
@@ -72,6 +73,11 @@ ${OBJECTDIR}/list.o: list.c
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} $@.d
 	$(COMPILE.c) -O2 -MMD -MP -MF $@.d -o ${OBJECTDIR}/list.o list.c
+
+${OBJECTDIR}/main.o: main.c 
+	${MKDIR} -p ${OBJECTDIR}
+	${RM} $@.d
+	$(COMPILE.c) -O2 -MMD -MP -MF $@.d -o ${OBJECTDIR}/main.o main.c
 
 ${OBJECTDIR}/test_messages.o: test_messages.c 
 	${MKDIR} -p ${OBJECTDIR}

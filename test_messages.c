@@ -5,8 +5,10 @@
 #include <stdio.h>
 
 int
-main( int argc, char **argv )
-{
+/*main( int argc, char **argv )
+{*/
+test_message(){
+
   char *comeback, one[] = "the quick brown fox", two[]="jumps over the lazy dog";
   pthread_t receive = pthread_self();
   int size;

@@ -16,6 +16,7 @@
                    displayName="Source Files"
                    projectFiles="true">
       <itemPath>list.c</itemPath>
+      <itemPath>main.c</itemPath>
       <itemPath>pmessages.c</itemPath>
       <itemPath>test_messages.c</itemPath>
     </logicalFolder>
@@ -40,7 +41,7 @@
       </toolsSet>
       <compileType>
         <linkerTool>
-          <output>test_messages</output>
+          <output>main</output>
         </linkerTool>
       </compileType>
     </conf>

@@ -3,9 +3,13 @@
 
 CCFLAGS = -g -Wall -lpthread 
 
-test_messages: test_messages.c pmessages.h pmessages.o list.o
-	gcc -o test_messages test_messages.c pmessages.o list.o $(CCFLAGS)
+main: main.c test_messages.o pmessages.o list.o
+	gcc -o main main.c test_messages.o pmessages.o list.o $(CCFLAGS)
+#$@ $^ $(CCFLAGS)
 
+test_messages.o: test_messages.c pmessages.h pmessages.o list.o
+	gcc $(CCFLAGS) -c test_messages.c
+	
 list.o: list.c list.h
 	gcc $(CCFLAGS) -c list.c
 pmessages.o: pmessages.c pmessages.h pmessages_private.h

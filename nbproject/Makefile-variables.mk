@@ -9,8 +9,8 @@ CND_DISTDIR=dist
 # Debug configuration
 CND_PLATFORM_Debug=GNU-Linux-x86
 CND_ARTIFACT_DIR_Debug=
-CND_ARTIFACT_NAME_Debug=test_messages
-CND_ARTIFACT_PATH_Debug=test_messages
+CND_ARTIFACT_NAME_Debug=main
+CND_ARTIFACT_PATH_Debug=main
 CND_PACKAGE_DIR_Debug=dist/Debug/GNU-Linux-x86/package
 CND_PACKAGE_NAME_Debug=multithread-c-program.tar
 CND_PACKAGE_PATH_Debug=dist/Debug/GNU-Linux-x86/package/multithread-c-program.tar

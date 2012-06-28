@@ -12,8 +12,8 @@ CND_DISTDIR=dist
 CND_BUILDDIR=build
 NBTMPDIR=${CND_BUILDDIR}/${CND_CONF}/${CND_PLATFORM}/tmp-packaging
 TMPDIRNAME=tmp-packaging
-OUTPUT_PATH=test_messages
-OUTPUT_BASENAME=test_messages
+OUTPUT_PATH=main
+OUTPUT_BASENAME=main
 PACKAGE_TOP_DIR=multithread-c-program/
 
 # Functions
