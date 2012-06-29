@@ -14,7 +14,6 @@
 #define USERNAME_MAX 30
 #define PASSWORD_MAX 30
 */
-#define OPERATION_MAX 4
 #define LINESZ 1024
 
 extern int errno; /* for printing error messages */
@@ -31,7 +30,7 @@ typedef struct {
 } account_t;
 
 typedef struct {
-    char operation[OPERATION_MAX];
+    char *operation;
     char *secret;
     char *users;
 } service_t;
@@ -173,8 +172,9 @@ read_ticket_file (char *filename ) {
         char buff[LINESZ];
 	FILE *fp;
 	const char *fname;
-        char username[20];
-        char password[20];
+        char operation[5];
+        char secret[100];
+        char users[200];
         int count=0;
         
 	fname = filename;
@@ -188,11 +188,12 @@ read_ticket_file (char *filename ) {
         if (fp != NULL) {
             while (fgets (buff, LINESZ, fp)) {
                 /* %[^:] is the same as %s meaning that read character until it gets to : delimiter*/
-                sscanf (buff,"%[^:]:%s",username,password);                
-                printf ("username: %s -> password: %s\n",username,password);
-                acounts[count].username =username;
-                acounts[count].password =password;
-                printf ("username2: %s -> password2: %s\n",acounts[count].username, acounts[count].password);
+                sscanf (buff,"%[^:]:%[^:]:%s",operation,secret,users);                
+                printf ("operation: %s -> secret: %s ->users: %s\n",operation,secret,users);
+                services[count].operation = operation;
+                services[count].secret = secret;
+                services[count].users = users;
+                printf ("operation2: %s -> secret2: %s ->users2: %s\n",services[count].operation,services[count].secret,services[count].users);
                 count ++;
             }
             fclose (fp);
@@ -200,6 +201,7 @@ read_ticket_file (char *filename ) {
  
         return 1;
 }
+
 int 
 main(int argc, char *argv[])
 {
@@ -207,10 +209,6 @@ main(int argc, char *argv[])
   long t1=1, t2=2;
   pthread_t threads[3];
   pthread_attr_t attr;
-/*
-  acounts = (account_t *) malloc( sizeof( account_t ) );
-  services = (service_t *) malloc( sizeof( service_t ) );
-*/
 
   /* Initialize mutex and condition variable objects */
   pthread_mutex_init(&print_lock, NULL);
@@ -227,7 +225,7 @@ main(int argc, char *argv[])
 */
 
   read_auth_file("users.txt");
-  
+  read_ticket_file("tickets.txt");
   
   /* Wait for all threads to complete */
   for (i = 0; i < NUM_THREADS; i++) {
