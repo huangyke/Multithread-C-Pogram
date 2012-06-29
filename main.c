@@ -5,10 +5,19 @@
 #include <semaphore.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 
 #define NUM_THREADS  3
 #define TCOUNT 10
 #define COUNT_LIMIT 12
+/*
+#define USERNAME_MAX 30
+#define PASSWORD_MAX 30
+*/
+#define OPERATION_MAX 4
+#define LINESZ 1024
+
+extern int errno; /* for printing error messages */
 
 int     count = 0;
 pthread_mutex_t print_lock;
@@ -16,6 +25,19 @@ pthread_cond_t count_threshold_cv;
 pthread_t server_thread_id;
 pthread_t client_thread_id;
 
+typedef struct {
+  char *username;
+  char *password;
+} account_t;
+
+typedef struct {
+    char operation[OPERATION_MAX];
+    char *secret;
+    char *users;
+} service_t;
+
+static account_t acounts[10];
+static service_t services[3];
 
 void
 printoutput(char *msg)
@@ -38,18 +60,12 @@ void
     /* Send and receive from destination process 1 (without threads running, we'll receive on thread 1 in torch's pthread implementation. */
 
     /* Send a single message for starters. */
-/*
-    char *printstring;
-*/
+
     while(1){
         if (send_message_to_thread( server_thread_id, one, strlen(one)+1) != MSG_OK) {
                 printoutput( "first failed\n" );
         }       
         if (receive_message( &client_thread_id, &comeback, &size) == MSG_OK) {
-/*
-                sprintf(printstring,"received message 1--%s--size %d\n", comeback, size);
-                printoutput (printstring );
-*/
                 pthread_mutex_lock(&print_lock);
 /*
                 printoutput ("Recieved client \n" );
@@ -86,23 +102,12 @@ void
     /* Send and receive from destination process 1 (without threads running, we'll receive on thread 1 in torch's pthread implementation. */
 
     /* Send a single message for starters. */
-/*
-    char *printstring;
-*/
     while(1) {      
         if (send_message_to_thread( client_thread_id, one, strlen(one)+1) != MSG_OK) {
                 printoutput( "first failed\n" );
         }
         if (receive_message( &server_thread_id, &comeback, &size) == MSG_OK) {
-
-/*
-                sprintf(printstring,"received message 1--%s--size %d\n", comeback, size);
-                printoutput (printstring);
-*/
                 pthread_mutex_lock(&print_lock);
-/*
-                printoutput ("Recieved server \n" );
-*/
                 printf("received message 1--%s--size %d\n", comeback, size);
                 fflush(stdout);
                 pthread_mutex_unlock(&print_lock);
@@ -120,7 +125,81 @@ void
     pthread_exit(NULL);
 }
 
+/* Read the authentication file
+ * interrupts.
+ * RETURNS:  <0 - if an error occurs 
+ *          >=0 - no error 
+ */
+int 
+read_auth_file (char *filename ) {
+        char buff[LINESZ];
+	FILE *fp;
+	const char *fname;
+        char username[20];
+        char password[20];
+        int count=0;
+        
+	fname = filename;
+	fp = fopen(fname, "r");
+	if (!fp){
+		fprintf(stderr, "reload_config: Failed to open file: %s\n", fname);
+		fprintf(stderr, "Error: %s\n", strerror(errno));
+		return -1;
+	}
 
+        if (fp != NULL) {
+            while (fgets (buff, LINESZ, fp)) {
+                /* %[^:] is the same as %s meaning that read character until it gets to : delimiter*/
+                sscanf (buff,"%[^:]:%s",username,password);                
+                printf ("username: %s -> password: %s\n",username,password);
+                acounts[count].username =username;
+                acounts[count].password =password;
+                printf ("username2: %s -> password2: %s\n",acounts[count].username, acounts[count].password);
+                count ++;
+            }
+            fclose (fp);
+        }
+ 
+        return 1;
+}
+
+/* Read the authentication file
+ * interrupts.
+ * RETURNS:  <0 - if an error occurs 
+ *          >=0 - no error 
+ */
+int 
+read_ticket_file (char *filename ) {
+        char buff[LINESZ];
+	FILE *fp;
+	const char *fname;
+        char username[20];
+        char password[20];
+        int count=0;
+        
+	fname = filename;
+	fp = fopen(fname, "r");
+	if (!fp){
+		fprintf(stderr, "reload_config: Failed to open file: %s\n", fname);
+		fprintf(stderr, "Error: %s\n", strerror(errno));
+		return -1;
+	}
+
+        if (fp != NULL) {
+            while (fgets (buff, LINESZ, fp)) {
+                /* %[^:] is the same as %s meaning that read character until it gets to : delimiter*/
+                sscanf (buff,"%[^:]:%s",username,password);                
+                printf ("username: %s -> password: %s\n",username,password);
+                acounts[count].username =username;
+                acounts[count].password =password;
+                printf ("username2: %s -> password2: %s\n",acounts[count].username, acounts[count].password);
+                count ++;
+            }
+            fclose (fp);
+        }
+ 
+        return 1;
+}
 int 
 main(int argc, char *argv[])
 {
@@ -128,6 +207,10 @@ main(int argc, char *argv[])
   long t1=1, t2=2;
   pthread_t threads[3];
   pthread_attr_t attr;
+/*
+  acounts = (account_t *) malloc( sizeof( account_t ) );
+  services = (service_t *) malloc( sizeof( service_t ) );
+*/
 
   /* Initialize mutex and condition variable objects */
   pthread_mutex_init(&print_lock, NULL);
@@ -138,9 +221,12 @@ main(int argc, char *argv[])
   pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
   
   /* Creating threads in joinable state*/
+/*
   pthread_create(&threads[0], &attr, client, (void *)t1); 
   pthread_create(&threads[1], &attr, server, (void *)t2);   
+*/
 
+  read_auth_file("users.txt");
   
   
   /* Wait for all threads to complete */
