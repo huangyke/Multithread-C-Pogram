@@ -7,21 +7,22 @@
 #include <unistd.h>
 #include <errno.h>
 
+
 #define NUM_THREADS  4
 #define TCOUNT 10
 #define COUNT_LIMIT 12
 #define AUTH_STRING "thisistheauthenticationstring123456"
 #define LINESZ 1024
-
 #define SIZE_USERNAME (30)
 #define SIZE_PASSWORD (30)
 #define SIZE_SERVICENAME (30)
 #define SIZE_SECRET (100)
 #define SIZE_USERS (200)
+#define SIZE_ACCOUNTS (10)
+#define SIZE_SERVICES (3)
 
 extern int errno; /* for printing error messages */
 
-int     count = 0;
 pthread_mutex_t print_lock;
 pthread_cond_t count_threshold_cv;
 
@@ -44,20 +45,100 @@ typedef struct {
     pthread_t auth_thread_id;
 } thread_ids_t;
 
-struct account_t accounts[10];
-struct service_t services[3];
+struct account_t accounts[SIZE_ACCOUNTS+1];
+struct service_t services[SIZE_SERVICES+1];
 
-void
-printoutput(char *msg)
-{
-    puts(msg);
-    fflush(stdout);
+//============================= OPERATIONS ===================================
+
+/* Read the authentication file
+ * interrupts.
+ * RETURNS:  <0 - if an error occurs 
+ *          >=0 - no error 
+ */
+int 
+read_auth_file (char *filename ) {
+        char buff[LINESZ];
+	FILE *fp;
+	const char *fname;
+        char username[20];
+        char password[20];
+        int count=0;
+        
+	fname = filename;
+	fp = fopen(fname, "r");
+	if (!fp){
+		fprintf(stderr, "reload_config: Failed to open file: %s\n", fname);
+		fprintf(stderr, "Error: %s\n", strerror(errno));
+		return -1;
+	}
+
+        if (fp != NULL) {
+            while (fgets (buff, LINESZ, fp)) {
+                /* %[^:] is the same as %s meaning that read character until it gets to : delimiter*/
+                sscanf (buff,"%[^:]:%s",username,password);                
+                strcpy(accounts[count].username,username);
+                strcpy(accounts[count].password,password);
+                count ++;
+            }
+            fclose (fp);
+        }
+        
+        
+/*
+        int sizeOfAccountsArray = sizeof(accounts)/sizeof(accounts[0]);
+        int i;
+        for(i=0;i<sizeOfAccountsArray;i++)
+        {
+            fflush(stdout);
+        }
+*/
+        
+        return 1;
 }
 
+/* Read the authentication file
+ * interrupts.
+ * RETURNS:  <0 - if an error occurs 
+ *          >=0 - no error 
+ */
+int 
+read_ticket_file (char *filename ) {
+        char buff[LINESZ];
+	FILE *fp;
+	const char *fname;
+        char servicename[5];
+        char secret[100];
+        char users[200];
+        int count=0;
+        
+	fname = filename;
+	fp = fopen(fname, "r");
+	if (!fp){
+		fprintf(stderr, "reload_config: Failed to open file: %s\n", fname);
+		fprintf(stderr, "Error: %s\n", strerror(errno));
+		return -1;
+	}
+
+        if (fp != NULL) {
+            while (fgets (buff, LINESZ, fp)) {
+                /* %[^:] is the same as %s meaning that read character until it gets to : delimiter*/
+                sscanf (buff,"%[^:]:%[^:]:%s",servicename,secret,users);                
+
+                strcpy(services[count].servicename, servicename);
+                strcpy(services[count].secret, secret);
+                strcpy(services[count].users , users);
+
+                count ++;
+            }
+            fclose (fp);
+        }
+ 
+        return 1;
+}
 
 /* Check the username password given as string parameter 
  * and check if they exist in the accounts array
- * interrupts.
+ * 
  * RETURNS:  0:username:0               - if it doesnt exist 
  *           1:username:auth_string     - if it exist
  */
@@ -87,8 +168,7 @@ checkIfUserPassExist(char *input)
     return output;
 }
 
-/* Process the message sent to ticket
- * interrupts.
+/* Process the message sent to ticket.
  * RETURNS:  0:username:servicename:0                           - if it doesn't exist
  *           1:username:servicename:service_secret_key          - if it exist
  */
@@ -121,6 +201,11 @@ processTicketMessageReceived(char *input)
     return output; 
 }
 
+/* Processes the message that the service thread receives from the client.
+ * PARAMETER: 
+ * RETURNS:  0:username:servicename:0                           - if it doesn't exist
+ *           1:username:servicename:service_secret_key          - if it exist
+ */
 char*
 processServiceMessageReceived(char *input)
 {
@@ -165,7 +250,9 @@ processServiceMessageReceived(char *input)
     sprintf(output, "0:%s:0",servicename);
     return output; 
 }
+//============================= END OF OPERATIONS ===================================
 
+//============================= THREADS ===================================
 
 void
 *auth_thread()
@@ -176,13 +263,10 @@ void
     int size;
     while(1){
         auth_thread_id = pthread_self();
-/*
-        printf("starting loop\n");
-*/
         if (receive_message( &auth_thread_id, &comeback, &size) == MSG_OK) {
-                printf("Auth ticket received message: 1--%s--size %d\n", comeback, size);
+                printf("Auth thread received    : %s\n", comeback);
                 char *processedMessage = checkIfUserPassExist(comeback);
-                printf("Auth processed the message: %s\n Sending it to client thread...\n", processedMessage );
+                printf("Auth --> Client         : %s\n", processedMessage );
                 fflush(stdout);
                 if (send_message_to_thread( auth_thread_id, processedMessage, strlen(processedMessage)+1) != MSG_OK) {
                         printf( "sending message from client to auth thread failed\n" );
@@ -191,12 +275,7 @@ void
         }
     }
     
-/*
-    printf("%s\n", checkIfUserPassExist("hamid:tavakoli") );
-    printf("%s\n", processTicketMessageReceived("hamid:add:thisistheauthenticationstring123456") );
-    printf("%s\n", processServiceMessageReceived("hamid:add:1:2:1:hamid:add:lkslkdfjweijfpiwe") );
-*/
-        pthread_exit(NULL);
+    pthread_exit(NULL);
 }
 
 void
@@ -209,13 +288,10 @@ void
     int size;
     while(1){
     ticket_thread_id = pthread_self();
-/*
-        printf("starting loop\n");
-*/
         if (receive_message( &ticket_thread_id, &comeback, &size) == MSG_OK) {
-                printf("Ticket thread received message: 1--%s--size %d\n", comeback, size);
+                printf("Ticket thread received    : %s\n", comeback);
                 char *processedMessage = processTicketMessageReceived(comeback);
-                printf("Ticket processed the message: %s\n Sending it to client thread...\n", processedMessage );
+                printf("Ticket --> Client         : %s\n", processedMessage );
                 fflush(stdout);
                 if (send_message_to_thread( ticket_thread_id, processedMessage, strlen(processedMessage)+1) != MSG_OK) {
                         printf( "sending message from client to auth thread failed\n" );
@@ -223,24 +299,9 @@ void
                 /* should free the processedMessage*/
         }
     }
-    
-/*
-    printf("%s\n", checkIfUserPassExist("hamid:tavakoli") );
-    printf("%s\n", processTicketMessageReceived("hamid:add:thisistheauthenticationstring123456") );
-    printf("%s\n", processServiceMessageReceived("hamid:add:1:2:1:hamid:add:lkslkdfjweijfpiwe") );
-*/
-        pthread_exit(NULL);
+    pthread_exit(NULL);
 }
 
-/*
-struct account_t
-*ConvertStringToAccountStruct(char *input)
-{
-    struct account_t account;
-    sscanf (input,"%[^:]:%s",account.username,account.password);  
-    return &account;
-}
-*/
 
 void 
 *server(void *t) 
@@ -251,13 +312,10 @@ void
     int size;
     while(1){
     server_thread_id = pthread_self();
-/*
-        printf("starting loop\n");
-*/
         if (receive_message( &server_thread_id, &comeback, &size) == MSG_OK) {
-                printf("Server thread received message: 1--%s--size %d\n", comeback, size);
+                printf("Server thread received    : %s\n", comeback);
                 char *processedMessage = processServiceMessageReceived(comeback);
-                printf("Server processed the message: %s\n Sending it to client thread...\n", processedMessage );
+                printf("Server --> Client         : %s\n", processedMessage );
                 fflush(stdout);
                 if (send_message_to_thread( server_thread_id, processedMessage, strlen(processedMessage)+1) != MSG_OK) {
                         printf( "sending message from client to auth thread failed\n" );
@@ -271,19 +329,17 @@ void
 void 
 *client(void *t) 
 {
-  char *comeback, message[300];
-  pthread_t client_thread_id;
+    char *comeback, message[300];
+    pthread_t client_thread_id;
     char flag[2];
     char username[SIZE_USERNAME+1];
     char authstring[200];
     int param1, param2;
     char servicename[SIZE_SERVICENAME+1];
-    
-  thread_ids_t *threadids = (thread_ids_t*)t;
-  
-  int size;
-  
- size_t length;
+
+    thread_ids_t *threadids = (thread_ids_t*)t;
+
+    int size;
 
     for (;;) {
         client_thread_id = pthread_self();
@@ -292,245 +348,141 @@ void
 
         fgets(buf, 1000, stdin);
         /* Send and receive from destination process 1 (without threads running, we'll receive on thread 1 in torch's pthread implementation. */
-        printf( "sending message from client to auth thread: %s...\n",buf );
+        printf( "Client --> Auth        : %s\n",buf );
         if (send_message_to_thread( threadids->auth_thread_id, buf, strlen(buf)+1) != MSG_OK) {
                 printf( "sending message from client to auth thread failed\n" );
         }
         if (receive_message( &client_thread_id, &comeback, &size) == MSG_OK) {
                 pthread_mutex_lock(&print_lock);
-                printf("received message from Auth thread--%s--size %d\n", comeback, size);
+                printf("Client thread received    : %s\n", comeback);
                 fflush(stdout);
                 pthread_mutex_unlock(&print_lock);
-                
+
 
                 sscanf (comeback,"%[^:]:%[^:]:%s",flag,username,authstring);
+/*
                 printf("flag: %s   username: %s    authstring: %s \n", flag,username,authstring);
+*/
                 if(!strcmp(flag,"0")==0)
                 { 
                     /* Get input from user again : operation parameter1 parameter2*/
                     printf("Please enter the operation: e.g  add 1 2 \n");
                     fgets(buf, 1000, stdin);
                     sscanf (buf,"%s %d %d",servicename,&param1,&param2);
+/*
                     printf("servicename: %s   param1: %d   param2: %d \n",servicename,param1,param2);                  
+*/
                 }
                 else{
+                    /* if the flag is 0 then dont continue*/
                     continue;
                 }
-                
+
                 sprintf(comeback, "%s:%s:%s",username,servicename, AUTH_STRING );
-                
+                printf( "Client --> Ticket        : %s\n",comeback );
                 if (send_message_to_thread( threadids->ticket_thread_id, comeback, strlen(comeback)+1) != MSG_OK) {
                         printf( "sending message from client to ticket thread failed\n" );
                 }
                 if (receive_message( &client_thread_id, &comeback, &size) == MSG_OK) {
-                                                
+
                         pthread_mutex_lock(&print_lock);
-                        printf("received message from ticket thread--%s--size %d\n", comeback, size);
+                        printf("Client thread received    : %s\n", comeback);
                         fflush(stdout);
                         pthread_mutex_unlock(&print_lock);
-                        
+
                         strcpy(message, comeback);
-                        
+
                         sprintf(comeback, "%s:%s:%d:%d:%s", username, servicename, param1, param2, message );
-                        
-                        printf("Send message to server thread--%s--size %d\n", comeback, size);
+
+                        printf( "Client --> Server        : %s\n",comeback );
                         if (send_message_to_thread( threadids->server_thread_id, comeback, strlen(comeback)+1) != MSG_OK) {
                                 printf( "sending message from client to server thread failed\n" );
                         }
                         if (receive_message( &client_thread_id, &comeback, &size) == MSG_OK) {
                                 pthread_mutex_lock(&print_lock);
-                                printf("received message from server thread--%s--size %d\n", comeback, size);
+                                printf("Client thread received    : %s\n", comeback);
                                 fflush(stdout);
                                 pthread_mutex_unlock(&print_lock);
                         }
                 }
         }
 
-        
+
 
     } /* end for */
 
     pthread_exit(NULL);
 }
+//============================= END OF THREADS =================================== 
 
 
-/* Read the authentication file
- * interrupts.
- * RETURNS:  <0 - if an error occurs 
- *          >=0 - no error 
- */
-int 
-read_auth_file (char *filename ) {
-        char buff[LINESZ];
-	FILE *fp;
-	const char *fname;
-        char username[20];
-        char password[20];
-        int count=0;
-        
-	fname = filename;
-	fp = fopen(fname, "r");
-	if (!fp){
-		fprintf(stderr, "reload_config: Failed to open file: %s\n", fname);
-		fprintf(stderr, "Error: %s\n", strerror(errno));
-		return -1;
-	}
-
-        if (fp != NULL) {
-            while (fgets (buff, LINESZ, fp)) {
-                /* %[^:] is the same as %s meaning that read character until it gets to : delimiter*/
-                sscanf (buff,"%[^:]:%s",username,password);                
-/*
-                printf ("username: %s -> password: %s\n",username,password);
-*/
-                strcpy(accounts[count].username,username);
-                strcpy(accounts[count].password,password);
-/*
-                printf ("username2: %s -> password2: %s\n",accounts[count]->username, accounts[count]->password);
-*/
-                count ++;
-            }
-            fclose (fp);
-        }
-        
-        
-        int sizeOfAccountsArray = sizeof(accounts)/sizeof(accounts[0]);
-        int i;
-        for(i=0;i<sizeOfAccountsArray;i++)
-        {
-/*
-            printf("array username: %s --> array password: %s \n",accounts[i]->username,accounts[i]->password);
-*/
-            fflush(stdout);
-        }
-        
-        return 1;
-}
-
-/* Read the authentication file
- * interrupts.
- * RETURNS:  <0 - if an error occurs 
- *          >=0 - no error 
- */
-int 
-read_ticket_file (char *filename ) {
-        char buff[LINESZ];
-	FILE *fp;
-	const char *fname;
-        char servicename[5];
-        char secret[100];
-        char users[200];
-        int count=0;
-        
-	fname = filename;
-	fp = fopen(fname, "r");
-	if (!fp){
-		fprintf(stderr, "reload_config: Failed to open file: %s\n", fname);
-		fprintf(stderr, "Error: %s\n", strerror(errno));
-		return -1;
-	}
-
-        if (fp != NULL) {
-            while (fgets (buff, LINESZ, fp)) {
-                /* %[^:] is the same as %s meaning that read character until it gets to : delimiter*/
-                sscanf (buff,"%[^:]:%[^:]:%s",servicename,secret,users);                
-/*
-                printf ("servicename: %s -> secret: %s ->users: %s\n",servicename,secret,users);
-*/
-                strcpy(services[count].servicename, servicename);
-                strcpy(services[count].secret, secret);
-                strcpy(services[count].users , users);
-/*
-                printf ("servicename2: %s -> secret2: %s ->users2: %s\n",services[count]->servicename,services[count]->secret,services[count]->users);
-*/
-                count ++;
-            }
-            fclose (fp);
-        }
- 
-        return 1;
-}
 
 int 
 main(int argc, char *argv[])
 {
-    int i;
-    long t1=1, t2=2;
-    pthread_t threads[4];
-    pthread_attr_t attr;
-    
-    thread_ids_t threadids;
-    
- //Initialize accounts global static variable
-    /*
-    int sizeOfArray = sizeof(accounts)/sizeof(accounts[0]);
-    for(i=0;i<sizeOfArray;i++)
+    /* If the arguments are not entered correctly then exit the program with proper instruction */
+    if ( argc != 3 )
     {
-        accounts[i].username[0] = '\0';
-        accounts[i].password[0] = '\0';
+        printf("Please enter the proper argument i.e: %s users.txt tickets.txt \n", argv[0] );
     }
+    else{
+        int i;
+        long t1=1, t2=2;
+        pthread_t threads[4];
+        pthread_attr_t attr;
+        thread_ids_t threadids;  /* creating threadids to store ids of all threads and pass it to the client thread*/
+        int     count = 0;
 
-    sizeOfArray = sizeof(services)/sizeof(services[0]);
-    for(i=0;i<sizeOfArray;i++)
-    {
-        services[i].servicename[0] = '\0';
-        services[i].secret[0] = '\0';
-        services[i].users[0] = '\0';
-    }
-*/
-    
-    read_auth_file("users.txt");
-    read_ticket_file("tickets.txt");
-
-    
 /*
-    auth_thread();
+        read_auth_file("users.txt");
+        read_ticket_file("tickets.txt");
 */
-    /* Don't start if we can't get the message system working. */
-    if (messages_init() == MSG_OK) {
-        /* Initialize mutex and condition variable objects */
-        pthread_mutex_init(&print_lock, NULL);
-        pthread_cond_init (&count_threshold_cv, NULL);
+        read_auth_file(argv[1]);
+        read_ticket_file(argv[2]);
 
-        /* For portability, explicitly create threads in a joinable state */
-        pthread_attr_init(&attr);
-        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
-        /* Creating threads in joinable state*/
+        /* Don't start if we can't get the message system working. */
+        if (messages_init() == MSG_OK) {
+            /* Initialize mutex and condition variable objects */
+            pthread_mutex_init(&print_lock, NULL);
+            pthread_cond_init (&count_threshold_cv, NULL);
 
-        pthread_create(&threads[1], &attr, server, (void *)t2); 
-        threadids.server_thread_id = threads[1];
-        pthread_create(&threads[2], &attr, auth_thread, (void *)t1);
-        threadids.auth_thread_id = threads[2];
-        pthread_create(&threads[3], &attr, ticket_thread, (void *)t2);   
-        threadids.ticket_thread_id = threads[3];
-        pthread_create(&threads[0], &attr, client, (void *)&threadids); 
-    /*
-        auth_thread();
-    */
-        /* Wait for all threads to complete */
-        for (i = 0; i < NUM_THREADS; i++) {
-        pthread_join(threads[i], NULL);
+            /* For portability, explicitly create threads in a joinable state */
+            pthread_attr_init(&attr);
+            pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+            /* Creating threads in joinable state*/
+
+            pthread_create(&threads[1], &attr, server, (void *)t2); 
+            threadids.server_thread_id = threads[1];
+            pthread_create(&threads[2], &attr, auth_thread, (void *)t1);
+            threadids.auth_thread_id = threads[2];
+            pthread_create(&threads[3], &attr, ticket_thread, (void *)t2);   
+            threadids.ticket_thread_id = threads[3];
+            pthread_create(&threads[0], &attr, client, (void *)&threadids); 
+
+            /* Wait for all threads to complete */
+            for (i = 0; i < NUM_THREADS; i++) {
+            pthread_join(threads[i], NULL);
+            }
+            printf ("Main(): Waited on %d threads. Final value of count = %d. Done.\n", 
+                    NUM_THREADS, count);
+
+            /* Clean up and exit */
+            pthread_attr_destroy(&attr);
+            pthread_mutex_destroy(&print_lock);
+            pthread_cond_destroy(&count_threshold_cv);
+            pthread_exit (NULL);
+            /* Clean up the message system. */
+
+            messages_end();
         }
-        printf ("Main(): Waited on %d threads. Final value of count = %d. Done.\n", 
-                NUM_THREADS, count);
-
-        /* Clean up and exit */
-        pthread_attr_destroy(&attr);
-        pthread_mutex_destroy(&print_lock);
-        pthread_cond_destroy(&count_threshold_cv);
-        pthread_exit (NULL);
-        /* Clean up the message system. */
-
-        messages_end();
-    }
-    else
-    {
-        printf ("Message system doesn't work!\n");
+        else
+        {
+            printf ("Message system doesn't work!\n");
+        }
     }
     
     printf("Exiting the main program...\n");
     return 0;
 }
-
-
