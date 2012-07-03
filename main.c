@@ -163,32 +163,19 @@ void
     auth_thread_id = pthread_self();
     char *comeback;
     int size;
-    
-        /* Don't start if we can't get the message system working. */
-        if (messages_init() == MSG_OK) {
-
-            /* Send and receive from destination process 1 (without threads running, we'll receive on thread 1 in torch's pthread implementation. */
-
-            if (send_message_to_thread( auth_thread_id, buf, strlen(buf)+1) != MSG_OK) {
-                    printf( "sending message from client to auth thread failed\n" );
-            }
-            while(1){
-                if (receive_message( &auth_thread_id, &comeback, &size) == MSG_OK) {
-                        pthread_mutex_lock(&print_lock);
-                        printf("received message 1--%s--size %d\n", comeback, size);
-                        fflush(stdout);
-                        pthread_mutex_unlock(&print_lock);
-                        break;
-                } 
-            }
-            /* Clean up the message system. */
-
-            messages_end();
+    while(1){
+        printf("starting loop\n");
+        if (receive_message( &auth_thread_id, &comeback, &size) == MSG_OK) {
+                printf("Auth ticket received message: 1--%s--size %d\n", comeback, size);
+                char *processedMessage = checkIfUserPassExist(comeback);
+                printf("Auth processed the message: %s\n Sending it to client thread...\n", processedMessage );
+                fflush(stdout);
+                if (send_message_to_thread( &client_thread_id, processedMessage, strlen(processedMessage)+1) != MSG_OK) {
+                        printf( "sending message from client to auth thread failed\n" );
+                }
+                /* should free the processedMessage*/
         }
-        else
-        {
-            printf ("Message system doesn't work!\n");
-        }
+    }
     
 /*
     printf("%s\n", checkIfUserPassExist("hamid:tavakoli") );
@@ -226,44 +213,30 @@ void
 {
   char *comeback, one[] = "I am client";
   client_thread_id = pthread_self();
-  
+/*
+  pthread_t *auththreadidclone = (pthread_t *)malloc(sizeof(pthread_t));
+*/
   int size;
   
  size_t length;
 
     for (;;) {
         char buf[1000];
-       
-        printf("Enter a line: \n");
-
+        printf("Please enter username and password: e.g  username:password \n");
+        
         fgets(buf, 1000, stdin);
-
-        printf("%s", buf);
-        /* Don't start if we can't get the message system working. */
-        if (messages_init() == MSG_OK) {
-
-            /* Send and receive from destination process 1 (without threads running, we'll receive on thread 1 in torch's pthread implementation. */
-
-            if (send_message_to_thread( auth_thread_id, buf, strlen(buf)+1) != MSG_OK) {
-                    printf( "sending message from client to auth thread failed\n" );
-            }
-            while(1){
-                if (receive_message( &client_thread_id, &comeback, &size) == MSG_OK) {
-                        pthread_mutex_lock(&print_lock);
-                        printf("received message 1--%s--size %d\n", comeback, size);
-                        fflush(stdout);
-                        pthread_mutex_unlock(&print_lock);
-                        break;
-                } 
-            }
-            /* Clean up the message system. */
-
-            messages_end();
+        /* Send and receive from destination process 1 (without threads running, we'll receive on thread 1 in torch's pthread implementation. */
+        printf( "sending message from client to auth thread: %s...\n",buf );
+        if (send_message_to_thread( auth_thread_id, buf, strlen(buf)+1) != MSG_OK) {
+                printf( "sending message from client to auth thread failed\n" );
         }
-        else
-        {
-            printf ("Message system doesn't work!\n");
+        if (receive_message( &client_thread_id, &comeback, &size) == MSG_OK) {
+                pthread_mutex_lock(&print_lock);
+                printf("received message from Auth thread--%s--size %d\n", comeback, size);
+                fflush(stdout);
+                pthread_mutex_unlock(&print_lock);
         }
+
     } /* end for */
 
     pthread_exit(NULL);
@@ -277,13 +250,9 @@ void
   server_thread_id = pthread_self();
   
   int size;
-  
-  /* Don't start if we can't get the message system working. */
-  if (messages_init() == MSG_OK) {
-
-    /* Send and receive from destination process 1 (without threads running, we'll receive on thread 1 in torch's pthread implementation. */
 
     /* Send a single message for starters. */
+/*
     while(1) {      
         if (send_message_to_thread( client_thread_id, one, strlen(one)+1) != MSG_OK) {
                 printoutput( "first failed\n" );
@@ -297,13 +266,8 @@ void
                 printoutput ("first receive failed\n");
         }
         sleep(1);
-  }
-
-
-    /* Clean up the message system. */
-
-    messages_end();
-  }    
+    }   
+*/
     pthread_exit(NULL);
 }
 
@@ -438,37 +402,45 @@ main(int argc, char *argv[])
 /*
     auth_thread();
 */
-    
-    /* Initialize mutex and condition variable objects */
-    pthread_mutex_init(&print_lock, NULL);
-    pthread_cond_init (&count_threshold_cv, NULL);
+    /* Don't start if we can't get the message system working. */
+    if (messages_init() == MSG_OK) {
+        /* Initialize mutex and condition variable objects */
+        pthread_mutex_init(&print_lock, NULL);
+        pthread_cond_init (&count_threshold_cv, NULL);
 
-    /* For portability, explicitly create threads in a joinable state */
-    pthread_attr_init(&attr);
-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+        /* For portability, explicitly create threads in a joinable state */
+        pthread_attr_init(&attr);
+        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
-    /* Creating threads in joinable state*/
-    
-    pthread_create(&threads[0], &attr, client, (void *)t1); 
-    pthread_create(&threads[1], &attr, server, (void *)t2); 
-    pthread_create(&threads[2], &attr, auth_thread, (void *)t1); 
-    pthread_create(&threads[3], &attr, ticket_thread, (void *)t2);   
-/*
-    auth_thread();
-*/
-    /* Wait for all threads to complete */
-    for (i = 0; i < NUM_THREADS; i++) {
-    pthread_join(threads[i], NULL);
+        /* Creating threads in joinable state*/
+
+        pthread_create(&threads[0], &attr, client, (void *)t1); 
+        pthread_create(&threads[1], &attr, server, (void *)t2); 
+        pthread_create(&threads[2], &attr, auth_thread, (void *)t1); 
+        pthread_create(&threads[3], &attr, ticket_thread, (void *)t2);   
+    /*
+        auth_thread();
+    */
+        /* Wait for all threads to complete */
+        for (i = 0; i < NUM_THREADS; i++) {
+        pthread_join(threads[i], NULL);
+        }
+        printf ("Main(): Waited on %d threads. Final value of count = %d. Done.\n", 
+                NUM_THREADS, count);
+
+        /* Clean up and exit */
+        pthread_attr_destroy(&attr);
+        pthread_mutex_destroy(&print_lock);
+        pthread_cond_destroy(&count_threshold_cv);
+        pthread_exit (NULL);
+        /* Clean up the message system. */
+
+        messages_end();
     }
-    printf ("Main(): Waited on %d threads. Final value of count = %d. Done.\n", 
-            NUM_THREADS, count);
-
-    /* Clean up and exit */
-    pthread_attr_destroy(&attr);
-    pthread_mutex_destroy(&print_lock);
-    pthread_cond_destroy(&count_threshold_cv);
-    pthread_exit (NULL);
-
+    else
+    {
+        printf ("Message system doesn't work!\n");
+    }
 }
 
 
