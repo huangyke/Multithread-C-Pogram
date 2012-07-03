@@ -170,7 +170,7 @@ void
                 char *processedMessage = checkIfUserPassExist(comeback);
                 printf("Auth processed the message: %s\n Sending it to client thread...\n", processedMessage );
                 fflush(stdout);
-                if (send_message_to_thread( &client_thread_id, processedMessage, strlen(processedMessage)+1) != MSG_OK) {
+                if (send_message_to_thread( client_thread_id, processedMessage, strlen(processedMessage)+1) != MSG_OK) {
                         printf( "sending message from client to auth thread failed\n" );
                 }
                 /* should free the processedMessage*/
@@ -213,9 +213,7 @@ void
 {
   char *comeback, one[] = "I am client";
   client_thread_id = pthread_self();
-/*
-  pthread_t *auththreadidclone = (pthread_t *)malloc(sizeof(pthread_t));
-*/
+  
   int size;
   
  size_t length;
@@ -223,7 +221,7 @@ void
     for (;;) {
         char buf[1000];
         printf("Please enter username and password: e.g  username:password \n");
-        
+
         fgets(buf, 1000, stdin);
         /* Send and receive from destination process 1 (without threads running, we'll receive on thread 1 in torch's pthread implementation. */
         printf( "sending message from client to auth thread: %s...\n",buf );
