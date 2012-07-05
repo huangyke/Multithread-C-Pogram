@@ -255,11 +255,12 @@ processServiceMessageReceived(char *input)
 void
 *auth_thread()
 {
-    pthread_t auth_thread_id = pthread_self();
+    pthread_t auth_thread_id;
     static char *processedMessage;
     static char *comeback;
     int size;
     while(1){
+        auth_thread_id = pthread_self();
         if (receive_message( &auth_thread_id, &comeback, &size) == MSG_OK) {
                 printf("Auth thread received    : %s\n", comeback);
                 
@@ -279,11 +280,12 @@ void
 void
 *ticket_thread()
 {
-    pthread_t ticket_thread_id = pthread_self();
+    pthread_t ticket_thread_id;
     static char *processedMessage;
     static char *comeback;
     int size;
     while(1){
+        ticket_thread_id = pthread_self();
         if (receive_message( &ticket_thread_id, &comeback, &size) == MSG_OK) {
                 printf("Ticket thread received    : %s\n", comeback);
                 processedMessage = processTicketMessageReceived(comeback);
@@ -302,11 +304,12 @@ void
 void 
 *server(void *t) 
 {
-    pthread_t server_thread_id = pthread_self();
+    pthread_t server_thread_id;
     static char *processedMessage;
     static char *comeback;
     int size;
     while(1){ 
+        server_thread_id = pthread_self();
         if (receive_message( &server_thread_id, &comeback, &size) == MSG_OK) {
                 printf("Server thread received    : %s\n", comeback);
                 processedMessage = processServiceMessageReceived(comeback);
